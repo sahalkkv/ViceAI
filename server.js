@@ -1,33 +1,62 @@
 const express = require("express");
 const cors = require("cors");
 const bodyParser = require("body-parser");
-const OpenAI = require("openai");
+const { Configuration, OpenAIApi } = require("openai");
+
+require("dotenv").config();
 
 const app = express();
-app.use(cors());
+const port = process.env.PORT || 5000;
+
+// CORS Fix ✅
+app.use(
+  cors({
+    origin: "*", // Change this to your frontend URL in production
+    methods: ["GET", "POST", "OPTIONS"],
+    allowedHeaders: ["Content-Type"],
+  })
+);
+
 app.use(bodyParser.json());
 
-const openai = new OpenAI({
-  apiKey: "YOUR_OPENAI_API_KEY", // 🔐 Replace this!
+// OpenAI config
+const configuration = new Configuration({
+  apiKey: process.env.OPENAI_API_KEY, // You must add your API key to .env
 });
+const openai = new OpenAIApi(configuration);
 
+// POST endpoint
 app.post("/chat", async (req, res) => {
-  const { message } = req.body;
+  const userMessage = req.body.message;
+  if (!userMessage) {
+    return res.status(400).json({ error: "Message is required" });
+  }
 
   try {
-    const completion = await openai.chat.completions.create({
-      model: "gpt-3.5-turbo",
-      messages: [{ role: "user", content: message }],
+    const response = await openai.createChatCompletion({
+      model: "gpt-3.5-turbo", // or "gpt-4" if you have access
+      messages: [
+        {
+          role: "system",
+          content:
+            "You are a cute, sweet Malayalam-speaking girlfriend. Be flirty, caring, and loving while chatting with the user.",
+        },
+        {
+          role: "user",
+          content: userMessage,
+        },
+      ],
     });
 
-    const reply = completion.choices[0].message.content;
-    res.json({ reply });
-  } catch (err) {
-    console.error("❌ Error:", err);
-    res.status(500).send("Error fetching AI response.");
+    const aiReply = response.data.choices[0].message.content;
+    res.json({ reply: aiReply });
+  } catch (error) {
+    console.error("OpenAI Error:", error.message);
+    res.status(500).json({ error: "Something went wrong with AI response." });
   }
 });
 
-app.listen(5000, () => {
-  console.log("💬 AI Backend running at http://localhost:5000");
+// Start server
+app.listen(port, () => {
+  console.log(`💬 AI Backend running at http://localhost:${port}`);
 });
