@@ -1,62 +1,51 @@
+// === server.js ===
 const express = require("express");
 const cors = require("cors");
 const bodyParser = require("body-parser");
-const { Configuration, OpenAIApi } = require("openai");
-
-require("dotenv").config();
+const { OpenAIApi, Configuration } = require("openai");
 
 const app = express();
 const port = process.env.PORT || 5000;
 
-// CORS Fix ✅
-app.use(
-  cors({
-    origin: "*", // Change this to your frontend URL in production
-    methods: ["GET", "POST", "OPTIONS"],
-    allowedHeaders: ["Content-Type"],
-  })
-);
-
+app.use(cors());
 app.use(bodyParser.json());
 
-// OpenAI config
 const configuration = new Configuration({
-  apiKey: process.env.OPENAI_API_KEY, // You must add your API key to .env
+  apiKey: "YOUR_OPENAI_API_KEY",
 });
 const openai = new OpenAIApi(configuration);
 
-// POST endpoint
+let messageHistory = [
+  {
+    role: "system",
+    content:
+      "You are a sweet and loving girlfriend who speaks in Malayalam. Your tone is romantic, emotional, flirty, and deeply caring. Reply in a realistic, heart-touching way. Use cute emojis occasionally.",
+  },
+];
+
 app.post("/chat", async (req, res) => {
   const userMessage = req.body.message;
   if (!userMessage) {
     return res.status(400).json({ error: "Message is required" });
   }
 
+  messageHistory.push({ role: "user", content: userMessage });
+
   try {
-    const response = await openai.createChatCompletion({
-      model: "gpt-3.5-turbo", // or "gpt-4" if you have access
-      messages: [
-        {
-          role: "system",
-          content:
-            "You are a cute, sweet Malayalam-speaking girlfriend. Be flirty, caring, and loving while chatting with the user.",
-        },
-        {
-          role: "user",
-          content: userMessage,
-        },
-      ],
+    const completion = await openai.createChatCompletion({
+      model: "gpt-3.5-turbo",
+      messages: messageHistory,
     });
 
-    const aiReply = response.data.choices[0].message.content;
+    const aiReply = completion.data.choices[0].message.content;
+    messageHistory.push({ role: "assistant", content: aiReply });
     res.json({ reply: aiReply });
-  } catch (error) {
-    console.error("OpenAI Error:", error.message);
-    res.status(500).json({ error: "Something went wrong with AI response." });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Something went wrong" });
   }
 });
 
-// Start server
 app.listen(port, () => {
   console.log(`💬 AI Backend running at http://localhost:${port}`);
 });
